@@ -709,14 +709,16 @@ namespace OnamaPaymentGateway
 
             //new for rtgs
             sb = sb.Replace("ACCOUNTTYPE", "accounttype");
-            sb = sb.Replace("ACCOUNTNO", "accountno");
+            sb = sb.Replace("<ACCOUNTNO", "<accountno");
+            sb = sb.Replace("</ACCOUNTNO", "</accountno");
             sb = sb.Replace("IFSCCODE", "ifsccode");
             sb = sb.Replace("TXNDATE", "txndate");
 
-            sb = sb.Replace("AMOUNT", "Amount");
 
             //new for rtgs
-            sb = sb.Replace("CUSTDET", "custdet");
+            sb = sb.Replace("AMOUNT", "amount");
+            sb = sb.Replace("<CUSTDET>", "<custdet>");
+            sb = sb.Replace("</CUSTDET>", "</custdet>");
             sb = sb.Replace("BENEFACCOUNTNO", "benefaccountno");
             sb = sb.Replace("BENEFCUSTDET", "benefcustdet");
             sb = sb.Replace("CUSTUNIQNO", "custuniqno");
