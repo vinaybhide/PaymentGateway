@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<appSettings prod="false">
+		<add key="rootpath" uatvalue="AppDomain.CurrentDomain.BaseDirectory" prodvalue="AppDomain.CurrentDomain.BaseDirectory"/>
+
+		<add key="pfxcertificatepassword" uatvalue="" prodvalue=""/>
+		<add key="pfxcertificatefile" uatvalue="vinay.pfx" prodvalue="vinay.pfx"/>
+		<add key="pemcertificatefile" uatvalue="vinay.pem" prodvalue="vinay.pem"/>
+		<add key="keyfile" uatvalue="vinay.key" prodvalue="vinay.key"/>
+		<add key="leafcertificatefile" uatvalue="vinay_Leaf.txt" prodvalue="vinay_Leaf.txt"/>
+
+		<add key="logfile" uatvalue="true" prodvalue="false"/>
+
+		<add key="clientid" uatvalue="" prodvalue=""/>
+		<add key="clientsecret" uatvalue="" prodvalue=""/>
+
+		<add key="scope" uatvalue="" prodvalue=""/>
+		<add key="granttype" uatvalue="client_credentials" prodvalue="client_credentials"/>
+		<add key="iduser" uatvalue="" prodvalue=""/>
+		<add key="groupid" uatvalue="" prodvalue=""/>
+		<add key="apikey" uatvalue="" prodvalue=""/>
+
+		<add key="signaturemethod" uatvalue="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256" prodvalue="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+		<add key="canonicalizationmethod" uatvalue="http://www.w3.org/TR/2001/REC-xml-c14n-20010315" prodvalue="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+
+		<add key="oauthtokenurl" uatvalue="" prodvalue=""/>
+		<add key="nefttransferurl" uatvalue="" prodvalue=""/>
+		<add key="neftinquiryurl" uatvalue="" prodvalue=""/>
+
+	</appSettings>
+</configuration>
