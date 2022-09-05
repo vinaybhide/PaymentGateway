@@ -1,11 +1,13 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.Remoting.Messaging;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Cryptography.Xml;
@@ -195,7 +197,10 @@ namespace OnamaPaymentGateway
             string pfxcertificatepassword, string pfxcertificatefileName, string pemcertificatefileName, string keyfileName, string leafcertificatefileName,
             string clientid, string clientsecret, string scope, string granttype, string iduser, string groupid, string apikey, string signaturemethod,
             string canonicalizationmethod, string oauthtokenurl, string neftinquiryurl,
-                                    out String responseStatus, out String responseStr, out String referenceno, out String codstatus,
+                                    out String responseStatus, out String responseStr, out String referenceno, 
+                                    out String codstatus1,
+                                    out String txtstatus,
+                                    out String codstatus2,
                                         out String txtreason, out String errorcode, out String errormessage, out String returncode)
         {
             RuntimeConfigurations runtimeConfigurations = LoadConfigurations(transactionId, debuglog, pfxcertificatepassword, pfxcertificatefileName, pemcertificatefileName,
@@ -206,7 +211,9 @@ namespace OnamaPaymentGateway
             referenceno = String.Empty;
             responseStatus = String.Empty;
             responseStr = String.Empty;
-            codstatus = String.Empty;
+            codstatus1 = String.Empty;
+            txtstatus = String.Empty;
+            codstatus2 = String.Empty;
             txtreason = String.Empty;
             errorcode = String.Empty;
             errormessage = String.Empty;
@@ -292,14 +299,16 @@ namespace OnamaPaymentGateway
                     decryptedReceivedKey = DecryptDecodeReceivedKey(runtimeConfigurations, responsePayload.GWSymmetricKeyEncryptedValue);
                     returnCode = DecryptDecodeReceivedXML(runtimeConfigurations, decryptedReceivedKey, responsePayload.ResponseSignatureEncryptedValue, out responseStr);
                     WriteToLog(runtimeConfigurations, responseStr);
-                    GetResultsFromInquiryResponse(runtimeConfigurations, responseStr, out referenceno, out codstatus, out txtreason,
+                    GetResultsFromInquiryResponse(runtimeConfigurations, responseStr, out referenceno, 
+                            out codstatus1, out txtstatus, out codstatus2, out txtreason,
                                                     out errorcode, out errormessage, out returncode);
-                    WriteToLog(runtimeConfigurations, "CODSTATUS: " + codstatus, enforce: true);
-                    WriteToLog(runtimeConfigurations, "TXTREASON: " + codstatus, enforce: true);
+                    WriteToLog(runtimeConfigurations, "CODSTATUS1: " + codstatus1, enforce: true);
+                    WriteToLog(runtimeConfigurations, "TXTSTATUS: " + txtstatus, enforce: true);
+                    WriteToLog(runtimeConfigurations, "CODSTATUS2: " + codstatus2, enforce: true);
+                    WriteToLog(runtimeConfigurations, "TXTREASON: " + txtreason, enforce: true);
                     WriteToLog(runtimeConfigurations, "ERRORCODE: " + errorcode, enforce: true);
                     WriteToLog(runtimeConfigurations, "ERRORMESSAGE: " + errormessage, enforce: true);
                     WriteToLog(runtimeConfigurations, "RETURNCODE: " + returncode, enforce: true);
-
                 }
                 else
                 {
@@ -361,7 +370,7 @@ namespace OnamaPaymentGateway
                 if (runtimeConfigurations == null)
                     throw new ArgumentException("Not all input parameters were passed");
 
-                WriteToLog(runtimeConfigurations, "NEFT called at: " + DateTime.Now.ToString(), enforce: true);
+                WriteToLog(runtimeConfigurations, "RTGS called at: " + DateTime.Now.ToString(), enforce: true);
 
                 if (String.IsNullOrEmpty(hexString)) throw new ArgumentException("hexString");
 
@@ -439,8 +448,9 @@ namespace OnamaPaymentGateway
                     string pfxcertificatepassword, string pfxcertificatefileName, string pemcertificatefileName, string keyfileName, string leafcertificatefileName,
                     string clientid, string clientsecret, string scope, string granttype, string iduser, string groupid, string apikey, string signaturemethod,
                     string canonicalizationmethod, string oauthtokenurl, string rtgsinquiryurl,
-                    out String responseStatus, out String responseStr, out String utr, out String referenceno, out String codstatus,
-                    out String txtreason, out String errorcode, out String errormessage, out String returncode)
+                    out String responseStatus, out String responseStr, out String utr, out String paymentrefno,
+                    out String codstatus1, out String txtstatus, out String codstatus2, out String txtreason, 
+                    out String errorcode, out String errormessage, out String returncode)
         {
             RuntimeConfigurations runtimeConfigurations = LoadConfigurations(transactionId, debuglog, pfxcertificatepassword, pfxcertificatefileName, pemcertificatefileName,
                 keyfileName, leafcertificatefileName, clientid, clientsecret, scope, granttype, iduser, groupid, apikey, signaturemethod,
@@ -448,10 +458,12 @@ namespace OnamaPaymentGateway
             runtimeConfigurations.transactionid = transactionId;
 
             utr = String.Empty;
-            referenceno = String.Empty;
+            paymentrefno = String.Empty;
             responseStatus = String.Empty;
             responseStr = String.Empty;
-            codstatus = String.Empty;
+            codstatus1 = String.Empty;
+            codstatus2 = String.Empty;
+            txtstatus = String.Empty;
             txtreason = String.Empty;
             errorcode = String.Empty;
             errormessage = String.Empty;
@@ -537,14 +549,19 @@ namespace OnamaPaymentGateway
                     decryptedReceivedKey = DecryptDecodeReceivedKey(runtimeConfigurations, responsePayload.GWSymmetricKeyEncryptedValue);
                     returnCode = DecryptDecodeReceivedXML(runtimeConfigurations, decryptedReceivedKey, responsePayload.ResponseSignatureEncryptedValue, out responseStr);
                     WriteToLog(runtimeConfigurations, responseStr);
-                    GetResultsFromInquiryResponse(runtimeConfigurations, responseStr, out referenceno, out codstatus, out txtreason,
-                                                    out errorcode, out errormessage, out returncode);
-                    WriteToLog(runtimeConfigurations, "CODSTATUS: " + codstatus, enforce: true);
-                    WriteToLog(runtimeConfigurations, "TXTREASON: " + codstatus, enforce: true);
+                    //GetResultsFromInquiryResponse(runtimeConfigurations, responseStr, out referenceno, out codstatus, out txtreason,
+                    //                                out errorcode, out errormessage, out returncode);
+
+                    GetResultsFromRTGSInquiryResponse(runtimeConfigurations, responseStr,
+                            out utr, out paymentrefno, out codstatus1, out txtstatus, out codstatus2,
+                            out txtreason, out errorcode, out errormessage, out returncode);
+                    WriteToLog(runtimeConfigurations, "CODSTATUS1: " + codstatus1, enforce: true);
+                    WriteToLog(runtimeConfigurations, "TXTSTATUS: " + txtstatus, enforce: true);
+                    WriteToLog(runtimeConfigurations, "CODSTATUS2: " + codstatus2, enforce: true);
+                    WriteToLog(runtimeConfigurations, "TXTREASON: " + txtreason, enforce: true);
                     WriteToLog(runtimeConfigurations, "ERRORCODE: " + errorcode, enforce: true);
                     WriteToLog(runtimeConfigurations, "ERRORMESSAGE: " + errormessage, enforce: true);
                     WriteToLog(runtimeConfigurations, "RETURNCODE: " + returncode, enforce: true);
-
                 }
                 else
                 {
@@ -809,12 +826,15 @@ namespace OnamaPaymentGateway
             }
         }
 
-        public void GetResultsFromInquiryResponse(RuntimeConfigurations cfg, String responseStr, out String referenceno, out String codstatus,
+        public void GetResultsFromInquiryResponse(RuntimeConfigurations cfg, String responseStr, out String referenceno,
+                            out String codstatus1,out String txtstatus, out String codstatus2,
                             out String txtreason, out String errorcode, out String errormessage, out String returncode)
         {
             XmlDocument doc = new XmlDocument();
             referenceno = String.Empty;
-            codstatus = String.Empty;
+            codstatus1 = String.Empty;
+            txtstatus = String.Empty;
+            codstatus2 = String.Empty;
             txtreason = String.Empty;
             errorcode = String.Empty;
             errormessage = String.Empty;
@@ -829,25 +849,74 @@ namespace OnamaPaymentGateway
                 //int to = responseStr.IndexOf("</codstatus");
                 //codstatus = responseStr.Substring(start, to);
                 XmlNodeList nodeList = null;
+                XmlNode childNode = null;
+
                 try
                 {
-                    nodeList = doc.DocumentElement.GetElementsByTagName("codstatus");
-                    if (nodeList.Count > 0)
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("codstatus");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    codstatus = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/header/codstatus");
+                    if (childNode != null)
                     {
-                        codstatus = nodeList[0].InnerText;
+                        codstatus1 = childNode.InnerText;
                     }
                 }
                 catch (Exception ex)
                 {
-                    WriteToLog(cfg, "Error while getting codstatus: " + ex.Message, enforce: true);
+                    WriteToLog(cfg, "Error while getting codstatus1: " + ex.Message, enforce: true);
+                }
+                try
+                {
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("codstatus");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    codstatus = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/header/txtstatus");
+                    if (childNode != null)
+                    {
+                        txtstatus = childNode.InnerText;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteToLog(cfg, "Error while getting txtstatus: " + ex.Message, enforce: true);
                 }
 
                 try
                 {
-                    nodeList = doc.DocumentElement.GetElementsByTagName("txtreason");
-                    if (nodeList.Count > 0)
+                    // / faml / inqlist / payment / codstatus
+                    // / faml / header / codstatus
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("utr");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    utr = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/inqlist/payment/codstatus");
+                    if (childNode != null)
                     {
-                        txtreason = nodeList[0].InnerText;
+                        codstatus2 = childNode.InnerText;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteToLog(cfg, "Error while getting codstatus2: " + ex.Message, enforce: true);
+                }
+
+                try
+                {
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("txtreason");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    txtreason = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/inqlist/payment/txtreason");
+                    if (childNode != null)
+                    {
+                        txtreason = childNode.InnerText;
                     }
                 }
                 catch (Exception ex)
@@ -857,15 +926,20 @@ namespace OnamaPaymentGateway
 
                 try
                 {
-                    nodeList = doc.DocumentElement.GetElementsByTagName("referenceno");
-                    if (nodeList.Count > 0)
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("referenceno");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    referenceno = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/inqlist/payment/referenceno");
+                    if (childNode != null)
                     {
-                        referenceno = nodeList[0].InnerText;
+                        referenceno = childNode.InnerText;
                     }
                 }
                 catch (Exception ex)
                 {
-                    WriteToLog(cfg, "Error while getting referenceno: " + ex.Message, enforce: true);
+                    WriteToLog(cfg, "Error while getting paymentrefno: " + ex.Message, enforce: true);
                 }
 
                 nodeList = doc.DocumentElement.GetElementsByTagName("rc");
@@ -947,13 +1021,16 @@ namespace OnamaPaymentGateway
             }
         }
 
-        public void GetResultsFromRTGSInquiryResponse(RuntimeConfigurations cfg, String responseStr, out String utr, out String referenceno, out String codstatus,
+        public void GetResultsFromRTGSInquiryResponse(RuntimeConfigurations cfg, String responseStr,
+                            out String utr, out String paymentrefno, out String codstatus1, out String txtstatus, out String codstatus2,
                             out String txtreason, out String errorcode, out String errormessage, out String returncode)
         {
             XmlDocument doc = new XmlDocument();
             utr = String.Empty;
-            referenceno = String.Empty;
-            codstatus = String.Empty;
+            paymentrefno = String.Empty;
+            codstatus1 = String.Empty;
+            txtstatus = String.Empty;
+            codstatus2 = String.Empty;
             txtreason = String.Empty;
             errorcode = String.Empty;
             errormessage = String.Empty;
@@ -968,39 +1045,75 @@ namespace OnamaPaymentGateway
                 //int to = responseStr.IndexOf("</codstatus");
                 //codstatus = responseStr.Substring(start, to);
                 XmlNodeList nodeList = null;
-
+                XmlNode childNode = null;
                 try
                 {
-                    nodeList = doc.DocumentElement.GetElementsByTagName("utr");
-                    if (nodeList.Count > 0)
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("codstatus");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    codstatus = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/header/codstatus");
+                    if (childNode != null)
                     {
-                        utr = nodeList[0].InnerText;
+                        codstatus1 = childNode.InnerText;
                     }
                 }
                 catch (Exception ex)
                 {
-                    WriteToLog(cfg, "Error while getting utr: " + ex.Message, enforce: true);
+                    WriteToLog(cfg, "Error while getting codstatus1: " + ex.Message, enforce: true);
                 }
 
                 try
                 {
-                    nodeList = doc.DocumentElement.GetElementsByTagName("codstatus");
-                    if (nodeList.Count > 0)
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("codstatus");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    codstatus = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/header/txtstatus");
+                    if (childNode != null)
                     {
-                        codstatus = nodeList[0].InnerText;
+                        txtstatus = childNode.InnerText;
                     }
                 }
                 catch (Exception ex)
                 {
-                    WriteToLog(cfg, "Error while getting codstatus: " + ex.Message, enforce: true);
+                    WriteToLog(cfg, "Error while getting txtstatus: " + ex.Message, enforce: true);
+                }
+
+
+                try
+                {
+                    // / faml / inqlist / payment / codstatus
+                    // / faml / header / codstatus
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("utr");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    utr = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/inqlist/payment/codstatus");
+                    if (childNode != null)
+                    {
+                        codstatus2 = childNode.InnerText;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteToLog(cfg, "Error while getting codstatus2: " + ex.Message, enforce: true);
                 }
 
                 try
                 {
-                    nodeList = doc.DocumentElement.GetElementsByTagName("txtreason");
-                    if (nodeList.Count > 0)
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("txtreason");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    txtreason = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/inqlist/payment/txtreason");
+                    if (childNode != null)
                     {
-                        txtreason = nodeList[0].InnerText;
+                        txtreason = childNode.InnerText;
                     }
                 }
                 catch (Exception ex)
@@ -1010,15 +1123,41 @@ namespace OnamaPaymentGateway
 
                 try
                 {
-                    nodeList = doc.DocumentElement.GetElementsByTagName("referenceno");
-                    if (nodeList.Count > 0)
+                    // / faml / inqlist / payment / codstatus
+                    // / faml / header / codstatus
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("utr");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    utr = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/inqlist/payment/utr");
+                    if(childNode != null)
                     {
-                        referenceno = nodeList[0].InnerText;
+                        utr = childNode.InnerText;
                     }
                 }
                 catch (Exception ex)
                 {
-                    WriteToLog(cfg, "Error while getting referenceno: " + ex.Message, enforce: true);
+                    WriteToLog(cfg, "Error while getting utr: " + ex.Message, enforce: true);
+                }
+
+
+                try
+                {
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("referenceno");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    referenceno = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/inqlist/payment/paymentrefno");
+                    if (childNode != null)
+                    {
+                        paymentrefno = childNode.InnerText;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteToLog(cfg, "Error while getting paymentrefno: " + ex.Message, enforce: true);
                 }
 
                 nodeList = doc.DocumentElement.GetElementsByTagName("rc");
