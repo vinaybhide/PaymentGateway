@@ -123,22 +123,30 @@ namespace OnamaPaymentGateway
                 //digitally sign the xml payload using customers private key
                 xmlAfterSign = NewSignPayLoadXML(runtimeConfigurations, compatibleXML.ToString());
 
+
+                WriteToLog(runtimeConfigurations, "Before GenerateSymmetricKey");
                 //Now generate 32 byte symmetric private key
                 GenerateSymmetricKey(out bytesPrivateEncryptionKey);
                 //String encodedPrivateKey = EncodeByteArrayToBase64String(bytesPrivateEncryptionKey);
 
+                WriteToLog(runtimeConfigurations, "Before NewEncryptSignedXML");
                 //encrypt the signed xml payload
                 encryptedData = NewEncryptSignedXML(xmlAfterSign.InnerXml, bytesPrivateEncryptionKey);
+
+                WriteToLog(runtimeConfigurations, "Before EncodeByteArrayToBase64String");
                 //encode encrypted signed xml payload
                 encodedData = EncodeByteArrayToBase64String(encryptedData);
 
+                WriteToLog(runtimeConfigurations, "Before NewEncryptionEncodeSymmetricKey");
                 //encrypt and encode the symmetric private key
                 encodedencryptedPrivateEncryptionKey = NewEncryptionEncodeSymmetricKey(runtimeConfigurations, bytesPrivateEncryptionKey);
 
+                WriteToLog(runtimeConfigurations, "Before GenerateOAuthToken");
                 //get oauth token
                 token = GenerateOAuthToken(runtimeConfigurations);
 
                 //Call NEFT API
+                WriteToLog(runtimeConfigurations, "Before ExecuteTransactionAPI");
                 responsePayload = ExecuteTransactionAPI(runtimeConfigurations, encodedData, encodedencryptedPrivateEncryptionKey, token,
                                                 string.IsNullOrEmpty(transactionId) ? "1234" : transactionId);
 
@@ -163,8 +171,8 @@ namespace OnamaPaymentGateway
             }
             catch (Exception ex)
             {
-                WriteToLog(runtimeConfigurations, ex.Message, enforce: true);
-                responseStr = ex.Message;
+                WriteToLog(runtimeConfigurations, "Exception in callNEFTAPI: " + ex.Message + Environment.NewLine + ex.StackTrace, enforce: true);
+                responseStr = "Exception in web method: " + ex.Message;
             }
 
             //returns 1 if everything wel OK else returns number which is <= 0
@@ -496,7 +504,7 @@ namespace OnamaPaymentGateway
                 if (runtimeConfigurations == null)
                     throw new ArgumentException("Not all input parameters were passed");
 
-                WriteToLog(runtimeConfigurations, "Inquiry called at: " + DateTime.Now.ToString(), enforce: true);
+                WriteToLog(runtimeConfigurations, "RTGS Inquiry called at: " + DateTime.Now.ToString(), enforce: true);
 
                 if (String.IsNullOrEmpty(hexString)) throw new ArgumentException("hexString");
 
@@ -1682,24 +1690,32 @@ namespace OnamaPaymentGateway
             {
                 string pemText = string.Empty;
                 string keyText = string.Empty;
-
+                WriteToLog(cfg, "Before reading pem cert file:" + AppDomain.CurrentDomain.BaseDirectory + cfg.pemcertificatefile);
                 using (TextReader tr = new StreamReader(AppDomain.CurrentDomain.BaseDirectory + cfg.pemcertificatefile))
                 {
                     pemText = tr.ReadToEnd();
+                    WriteToLog(cfg, "PEM-TEXT:" + pemText);
                 }
 
+                WriteToLog(cfg, "Before reading key file:" + AppDomain.CurrentDomain.BaseDirectory + cfg.keyfile);
                 using (TextReader tr = new StreamReader(AppDomain.CurrentDomain.BaseDirectory + cfg.keyfile))
                 {
                     keyText = tr.ReadToEnd();
+                    WriteToLog(cfg, "KEY-TEXT:" + keyText);
                 }
+                WriteToLog(cfg, "Before Certificate(pemText, keyText, pass)");
                 Certificate cert = new Certificate(pemText, keyText, pass);
 
-                certificate = cert.GetCertificateFromPEMstring(false);
+                WriteToLog(cfg, "Before cert.GetCertificateFromPEMstring(false)");
+                certificate = cert.GetCertificateFromPEMstring(cfg, false);
+                WriteToLog(cfg, "End of GetCertificateFromPEM_KEY");
             }
             catch (Exception ex)
             {
-                WriteToLog(cfg, ex.Message, enforce: true);
+                WriteToLog(cfg, ex.Message + Environment.NewLine + ex.StackTrace, enforce: true);
+                throw ex;
             }
+            WriteToLog(cfg, "Exiting GetCertificateFromPEM_KEY");
             return certificate;
         }
         //public XmlDocument NewSignPayloadXML(XmlDocument xmlBeforeSign)
@@ -1713,6 +1729,7 @@ namespace OnamaPaymentGateway
                 //if (xmlReader == null)
                 //    throw new ArgumentException(nameof(xmlReader));
 
+                WriteToLog(cfg, "Inside NewSignPayLoadXML");
                 xmlBeforeSign = new XmlDocument();// { PreserveWhitespace = false };
 
                 //xmlBeforeSign.Load(xmlReader);
@@ -1756,12 +1773,16 @@ namespace OnamaPaymentGateway
                 requestAfterElement.AppendChild(faxmlNode);
                 xmlBeforeSign.AppendChild(requestAfterElement);
 
+                WriteToLog(cfg, "Before GetCertificateFromPEM_KEY(cfg)");
                 X509Certificate2 cert = GetCertificateFromPEM_KEY(cfg);
 
                 //var rsa = RSA.Create(cert.PrivateKey.KeySize);
                 var signedXml = new SignedXml(xmlBeforeSign);
 
+                WriteToLog(cfg, "Before cert.GetRSAPrivateKey()");
                 signedXml.SigningKey = cert.GetRSAPrivateKey();
+
+                WriteToLog(cfg, "Before signedXml.Signature");
                 Signature XMLSignature = signedXml.Signature;
 
                 signedXml.SignedInfo.SignatureMethod = cfg.signaturemethod; //"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
@@ -1774,7 +1795,10 @@ namespace OnamaPaymentGateway
                 XMLSignature.SignedInfo.AddReference(reference);
 
                 var keyInfo = new KeyInfo();
+
+                WriteToLog(cfg, "Before KeyInfoX509Data(cert)");
                 var keyData = new KeyInfoX509Data(cert);
+                WriteToLog(cfg, "Adding subjectname: " + cert.SubjectName.Name);
                 keyData.AddSubjectName(cert.SubjectName.Name);
 
                 //keyInfo.AddClause(new KeyInfoX509Data(cert));
@@ -1783,18 +1807,21 @@ namespace OnamaPaymentGateway
                 //signedXml.KeyInfo = keyInfo;
                 XMLSignature.KeyInfo = keyInfo;
 
+                WriteToLog(cfg, "Before signedXml.ComputeSignature()");
                 signedXml.ComputeSignature();
 
                 XmlElement xmlDigitalSignature = signedXml.GetXml();
 
                 // Append the element to the XML document.
                 xmlBeforeSign.DocumentElement.InsertAfter(xmlBeforeSign.ImportNode(xmlDigitalSignature, true), faxmlNode);
+                WriteToLog(cfg, "End of NewSignPayLoadXML");
             }
             catch (Exception ex)
             {
-                WriteToLog(cfg, ex.Message, enforce: true);
+                WriteToLog(cfg, ex.Message + Environment.NewLine + ex.StackTrace, enforce: true);
+                throw ex;
             }
-
+            WriteToLog(cfg, "Exiting NewSignPayLoadXML xmlBeforeSign= " + xmlBeforeSign.OuterXml);
             return xmlBeforeSign;
         }
 
@@ -1833,12 +1860,17 @@ namespace OnamaPaymentGateway
             OAuthToken oAuthToken = null;
             try
             {
+                WriteToLog(cfg, "Inside GenerateOAuthToken");
                 var authenticationString = $"{cfg.clientid}:{cfg.clientsecret}";
+                WriteToLog(cfg, "Before EncodeByteArrayToBase64String(_encoder.GetBytes(authenticationString))");
                 var base64EncodedAuthenticationString = EncodeByteArrayToBase64String(_encoder.GetBytes(authenticationString));
 
+                WriteToLog(cfg, "Before X509Certificate2: " + AppDomain.CurrentDomain.BaseDirectory + cfg.pfxcertificatefile + Environment.NewLine + cfg.pfxcertificatepassword);
                 X509Certificate2 cert = new X509Certificate2(AppDomain.CurrentDomain.BaseDirectory + cfg.pfxcertificatefile, cfg.pfxcertificatepassword);
                 HttpClientHandler handler = new HttpClientHandler();
+                WriteToLog(cfg, "Before handler.ClientCertificates.Add(cert)");
                 handler.ClientCertificates.Add(cert);
+                WriteToLog(cfg, "Before new HttpClient(handler)");
                 var client = new HttpClient(handler);
                 //GetATokenToTestMyRestApiUsingHttpClient(client);
                 //return;
@@ -1847,23 +1879,31 @@ namespace OnamaPaymentGateway
 
                 var postData = new List<KeyValuePair<String, String>>();
 
+                WriteToLog(cfg, "Before new AuthenticationHeaderValue(\"Basic\", base64EncodedAuthenticationString)");
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", base64EncodedAuthenticationString);
-
+                WriteToLog(cfg, "Before new FormUrlEncodedContent(postData)");
                 HttpContent content = new FormUrlEncodedContent(postData);
+
+                WriteToLog(cfg, "Before new MediaTypeHeaderValue(\"application/x-www-form-urlencoded\")");
                 content.Headers.ContentType = new MediaTypeHeaderValue("application/x-www-form-urlencoded");
 
+                WriteToLog(cfg, "Before client.PostAsync: " + cfg.oauthtokenurl + "?" + "grant_type=" + cfg.granttype + "&" + "scope=" + cfg.scope);
                 var responseResult = client.PostAsync(cfg.oauthtokenurl + "?" + "grant_type=" + cfg.granttype + "&" + "scope=" + cfg.scope, content).Result;
                 if (!responseResult.IsSuccessStatusCode)
                 {
+                    WriteToLog(cfg, "oAuth URL Failed: " + responseResult.Content.ReadAsStringAsync().Result, enforce: true);
                     throw new HttpRequestException(responseResult.Content.ReadAsStringAsync().Result);
                 }
                 var jsonContent = responseResult.Content.ReadAsStringAsync().Result;
                 oAuthToken = JsonConvert.DeserializeObject<OAuthToken>(jsonContent);
+                WriteToLog(cfg, "End of GenerateOAuthToken");
             }
             catch (Exception ex)
             {
-                WriteToLog(cfg, ex.Message, enforce: true);
+                WriteToLog(cfg, "Exception in GenerateOAuthToken: " + ex.Message + Environment.NewLine + ex.StackTrace, enforce: true);
+                throw ex;
             }
+            WriteToLog(cfg, "Exiting GenerateOAuthToken");
             return oAuthToken;
         }
 
@@ -1874,6 +1914,8 @@ namespace OnamaPaymentGateway
 
             try
             {
+                WriteToLog(cfg, "Inside ExecuteTransactionAPI");
+
                 var requestPayload = new RequestPayload
                 {
                     RequestSignatureEncryptedValue = encodedData,
@@ -1891,6 +1933,7 @@ namespace OnamaPaymentGateway
                 //httpContent.Headers.ContentType = new MediaTypeHeaderValue("application/x-www-form-urlencoded");
                 httpContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
+                WriteToLog(cfg, "Before X509Certificate2: " + AppDomain.CurrentDomain.BaseDirectory + cfg.pfxcertificatefile + Environment.NewLine +  cfg.pfxcertificatepassword);
 
                 X509Certificate2 cert = new X509Certificate2(AppDomain.CurrentDomain.BaseDirectory + cfg.pfxcertificatefile, cfg.pfxcertificatepassword);
                 //X509Certificate2 cert = new X509Certificate2(pemcertificateFile);
@@ -1901,6 +1944,7 @@ namespace OnamaPaymentGateway
                 client.DefaultRequestHeaders.Add("apikey", cfg.apikey);
                 // Do the actual request and await the response
                 //var httpResponse = client.PostAsync((bIsNEFT) ? cfg.nefttransferurl : cfg.neftinquiryurl, httpContent).Result;
+                WriteToLog(cfg, "Before client.PostAsync: " + cfg.targeturl);
                 var httpResponse = client.PostAsync(cfg.targeturl, httpContent).Result;
                 // If the response contains content we want to read it!
                 if (httpResponse.Content != null)
@@ -1909,13 +1953,17 @@ namespace OnamaPaymentGateway
 
                     // From here on you could deserialize the ResponseContent back again to a concrete C# type using Json.Net
                     var jsonContent = httpResponse.Content.ReadAsStringAsync().Result;
+                    WriteToLog(cfg, "Result from API URL: " + jsonContent);
                     responseData = JsonConvert.DeserializeObject<ResponsePayload>(jsonContent);
                 }
+                WriteToLog(cfg, "End of ExecuteTransactionAPI");
             }
             catch (Exception ex)
             {
-                WriteToLog(cfg, ex.Message, enforce: true);
+                WriteToLog(cfg, "Exception in ExecuteTransactionAPI: " + ex.Message + Environment.NewLine + ex.StackTrace, enforce: true);
+                throw ex;
             }
+            WriteToLog(cfg, "Exiting ExecuteTransactionAPI");
             return responseData;
         }
     }

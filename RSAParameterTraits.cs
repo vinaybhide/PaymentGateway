@@ -24,7 +24,7 @@ namespace OnamaPaymentGateway
                 // It's not an even power of 2, so round it up to the nearest power of 2.
                 assumedLength = (int)(logbase + 1.0);
                 assumedLength = (int)(Math.Pow(2, assumedLength));
-                System.Diagnostics.Debug.Assert(false);  // Can this really happen in the field?  I've never seen it, so if it happens
+                //System.Diagnostics.Debug.Assert(false);  // Can this really happen in the field?  I've never seen it, so if it happens
                 // you should verify that this really does the 'right' thing!
             }
 
@@ -61,7 +61,7 @@ namespace OnamaPaymentGateway
                     this.size_InvQ = 0x100;
                     break;
                 default:
-                    System.Diagnostics.Debug.Assert(false); // Unknown key size?
+                    //System.Diagnostics.Debug.Assert(false); // Unknown key size?
                     break;
             }
         }
