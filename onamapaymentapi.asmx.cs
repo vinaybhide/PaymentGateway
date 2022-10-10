@@ -586,6 +586,251 @@ namespace OnamaPaymentGateway
             //return 1 if everuth went OK, else returns a number which is <= 0
             return returnCode;
         }
+
+        [WebMethod]
+        public int callA2AAPI(string hexString, string transactionId, string debuglog,
+                    string pfxcertificatepassword, string pfxcertificatefileName, string pemcertificatefileName, string keyfileName, string leafcertificatefileName,
+                    string clientid, string clientsecret, string scope, string granttype, string iduser, string groupid, string apikey, string signaturemethod,
+                    string canonicalizationmethod, string oauthtokenurl, string rtgstransferurl,
+                    out String responseStatus, out String responseStr, out String codstatus, out String txtstatus)
+        {
+            RuntimeConfigurations runtimeConfigurations = LoadConfigurations(transactionId, debuglog, pfxcertificatepassword, pfxcertificatefileName, pemcertificatefileName,
+                keyfileName, leafcertificatefileName, clientid, clientsecret, scope, granttype, iduser, groupid, apikey, signaturemethod,
+                canonicalizationmethod, oauthtokenurl, rtgstransferurl);
+
+            responseStatus = String.Empty;
+            responseStr = String.Empty;
+            codstatus = String.Empty;
+            txtstatus = String.Empty;
+
+            StringBuilder inputxmlStr = new StringBuilder("");
+            StringBuilder compatibleXML = new StringBuilder("");
+
+            //XmlDocument xmlBeforeSign = null;
+            XmlDocument xmlAfterSign = null;
+
+            byte[] bytesPrivateEncryptionKey = new byte[32];
+            String encodedencryptedPrivateEncryptionKey = String.Empty;
+            byte[] encryptedData;
+            String encodedData = String.Empty;
+
+            OAuthToken token;
+
+            ResponsePayload responsePayload;
+            byte[] decryptedReceivedKey;
+            string responseXML = String.Empty;
+            int returnCode = 0;
+
+            //int NumberChars = hexString.Length;
+
+            //Since we get String in hex format we use half of its length to convert the String into bytes so that we can get the actual xml
+            //byte[] bytes = new byte[NumberChars / 2];
+
+            try
+            {
+                if (runtimeConfigurations == null)
+                    throw new ArgumentException("Not all input parameters were passed");
+
+                WriteToLog(runtimeConfigurations, "A2A called at: " + DateTime.Now.ToString(), enforce: true);
+
+                if (String.IsNullOrEmpty(hexString)) throw new ArgumentException("hexString");
+
+                WriteToLog(runtimeConfigurations, "HEX Input");
+                WriteToLog(runtimeConfigurations, hexString);
+
+                inputxmlStr.Append(ConvertHexStringToByteToString(hexString));
+
+                WriteToLog(runtimeConfigurations, "Decoded HEX Input");
+                WriteToLog(runtimeConfigurations, inputxmlStr.ToString());
+
+                compatibleXML.Append(MakeA2AXMLCaseCompatible(inputxmlStr.ToString()));
+                WriteToLog(runtimeConfigurations, "Compatible payload");
+                WriteToLog(runtimeConfigurations, compatibleXML.ToString());
+
+                ////xmlBeforeSign = new XmlDocument { PreserveWhitespace = true };
+                //StringReader stringreader = new StringReader(inputxmlStr);
+                //XmlReader xmlreader = XmlReader.Create(stringreader);
+
+                //inputxmlStr = ConvertToLower(xmlreader);
+
+                //digitally sign the xml payload using customers private key
+                xmlAfterSign = NewSignPayLoadXML(runtimeConfigurations, compatibleXML.ToString());
+
+                //Now generate 32 byte symmetric private key
+                GenerateSymmetricKey(out bytesPrivateEncryptionKey);
+                //String encodedPrivateKey = EncodeByteArrayToBase64String(bytesPrivateEncryptionKey);
+
+                //encrypt the signed xml payload
+                encryptedData = NewEncryptSignedXML(xmlAfterSign.InnerXml, bytesPrivateEncryptionKey);
+                //encode encrypted signed xml payload
+                encodedData = EncodeByteArrayToBase64String(encryptedData);
+
+                //encrypt and encode the symmetric private key
+                encodedencryptedPrivateEncryptionKey = NewEncryptionEncodeSymmetricKey(runtimeConfigurations, bytesPrivateEncryptionKey);
+
+                //get oauth token
+                token = GenerateOAuthToken(runtimeConfigurations);
+
+                //Call A2A API
+                responsePayload = ExecuteTransactionAPI(runtimeConfigurations, encodedData, encodedencryptedPrivateEncryptionKey, token,
+                                                string.IsNullOrEmpty(transactionId) ? "1234" : transactionId);
+
+                responseStatus = responsePayload.Status;
+                WriteToLog(runtimeConfigurations, "Response Status: " + responseStatus, enforce: true);
+
+                if (responsePayload.Status.ToUpper().Equals("SUCCESS") == true)
+                {
+                    //decode & decrypt key
+                    decryptedReceivedKey = DecryptDecodeReceivedKey(runtimeConfigurations, responsePayload.GWSymmetricKeyEncryptedValue);
+                    returnCode = DecryptDecodeReceivedXML(runtimeConfigurations, decryptedReceivedKey, responsePayload.ResponseSignatureEncryptedValue, out responseStr);
+                    WriteToLog(runtimeConfigurations, responseStr);
+                    GetResultsFromNEFTResponse(runtimeConfigurations, responseStr, out codstatus, out txtstatus);
+                    WriteToLog(runtimeConfigurations, "CODSTATUS: " + codstatus, enforce: true);
+                    WriteToLog(runtimeConfigurations, "TXTSTATUS: " + txtstatus, enforce: true);
+                }
+                else
+                {
+                    responseStr = responsePayload.Status;
+                    returnCode = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteToLog(runtimeConfigurations, ex.Message, enforce: true);
+                responseStr = ex.Message;
+            }
+
+            //returns 1 if everything wel OK else returns number which is <= 0
+            return returnCode;
+        }
+
+        [WebMethod]
+        public int callA2AInquiryAPI(String hexString, string transactionId, string debuglog,
+                    string pfxcertificatepassword, string pfxcertificatefileName, string pemcertificatefileName, string keyfileName, string leafcertificatefileName,
+                    string clientid, string clientsecret, string scope, string granttype, string iduser, string groupid, string apikey, string signaturemethod,
+                    string canonicalizationmethod, string oauthtokenurl, string rtgsinquiryurl,
+                    out String responseStatus, out String responseStr, out String codstatus, out String txtreason, 
+                    out String errorcode, out String errormessage, out String returncode)
+        {
+            RuntimeConfigurations runtimeConfigurations = LoadConfigurations(transactionId, debuglog, pfxcertificatepassword, pfxcertificatefileName, pemcertificatefileName,
+                keyfileName, leafcertificatefileName, clientid, clientsecret, scope, granttype, iduser, groupid, apikey, signaturemethod,
+                canonicalizationmethod, oauthtokenurl, rtgsinquiryurl);
+            runtimeConfigurations.transactionid = transactionId;
+
+            responseStatus = String.Empty;
+            responseStr = String.Empty;
+            codstatus = String.Empty;
+            txtreason = String.Empty;
+            errorcode = String.Empty;
+            errormessage = String.Empty;
+            returncode = String.Empty;
+
+            StringBuilder inputxmlStr = new StringBuilder("");
+            StringBuilder compatibleXML = new StringBuilder("");
+
+            XmlDocument xmlAfterSign = null;
+
+            byte[] bytesPrivateEncryptionKey = new byte[32];
+            String encodedencryptedPrivateEncryptionKey = String.Empty;
+            byte[] encryptedData;
+            String encodedData = String.Empty;
+
+            OAuthToken token;
+
+            ResponsePayload responsePayload;
+            byte[] decryptedReceivedKey;
+            string responseXML = String.Empty;
+            int returnCode = 0;
+
+            //int NumberChars = hexString.Length;
+
+            //Since we get String in hex format we use half of its length to convert the String into bytes so that we can get the actual xml
+            //byte[] bytes = new byte[NumberChars / 2];
+
+            try
+            {
+                if (runtimeConfigurations == null)
+                    throw new ArgumentException("Not all input parameters were passed");
+
+                WriteToLog(runtimeConfigurations, "A2A Inquiry called at: " + DateTime.Now.ToString(), enforce: true);
+
+                if (String.IsNullOrEmpty(hexString)) throw new ArgumentException("hexString");
+
+                WriteToLog(runtimeConfigurations, "HEX Input");
+                WriteToLog(runtimeConfigurations, hexString);
+
+                inputxmlStr.Append(ConvertHexStringToByteToString(hexString));
+
+                WriteToLog(runtimeConfigurations, "Decoded HEX Input");
+                WriteToLog(runtimeConfigurations, inputxmlStr.ToString());
+
+                compatibleXML.Append(MakeInquiryXMLCaseCompatible(inputxmlStr.ToString()));
+                WriteToLog(runtimeConfigurations, "Compatible input");
+                WriteToLog(runtimeConfigurations, compatibleXML.ToString());
+
+                //xmlBeforeSign = new XmlDocument { PreserveWhitespace = true };
+                //StringReader stringreader = new StringReader(inputxmlStr);
+                //XmlReader xmlreader = XmlReader.Create(stringreader);
+
+                //inputxmlStr = ConvertToLower(xmlreader);
+
+                //digitally sign the xml payload using customers private key
+                xmlAfterSign = NewSignPayLoadXML(runtimeConfigurations, compatibleXML.ToString());
+
+                //Now generate 32 byte symmetric private key
+                GenerateSymmetricKey(out bytesPrivateEncryptionKey);
+                //String encodedPrivateKey = EncodeByteArrayToBase64String(bytesPrivateEncryptionKey);
+
+                //encrypt the signed xml payload
+                encryptedData = NewEncryptSignedXML(xmlAfterSign.InnerXml, bytesPrivateEncryptionKey);
+                //encode encrypted signed xml payload
+                encodedData = EncodeByteArrayToBase64String(encryptedData);
+
+                //encrypt and encode the symmetric private key
+                encodedencryptedPrivateEncryptionKey = NewEncryptionEncodeSymmetricKey(runtimeConfigurations, bytesPrivateEncryptionKey);
+
+                //get oauth token
+                token = GenerateOAuthToken(runtimeConfigurations);
+
+                //Call NEFT API
+                responsePayload = ExecuteTransactionAPI(runtimeConfigurations, encodedData, encodedencryptedPrivateEncryptionKey, token,
+                                                string.IsNullOrEmpty(transactionId) ? "1234" : transactionId);
+
+                responseStatus = responsePayload.Status;
+                WriteToLog(runtimeConfigurations, "Response Status: " + responseStatus, enforce: true);
+
+                if (responsePayload.Status.ToUpper().Equals("SUCCESS") == true)
+                {
+                    //decode & decrypt key
+                    decryptedReceivedKey = DecryptDecodeReceivedKey(runtimeConfigurations, responsePayload.GWSymmetricKeyEncryptedValue);
+                    returnCode = DecryptDecodeReceivedXML(runtimeConfigurations, decryptedReceivedKey, responsePayload.ResponseSignatureEncryptedValue, out responseStr);
+                    WriteToLog(runtimeConfigurations, responseStr);
+                    //GetResultsFromInquiryResponse(runtimeConfigurations, responseStr, out referenceno, out codstatus, out txtreason,
+                    //                                out errorcode, out errormessage, out returncode);
+
+                    GetResultsFromA2AInquiryResponse(runtimeConfigurations, responseStr,
+                            out codstatus, out txtreason, out errorcode, out errormessage, out returncode);
+                    WriteToLog(runtimeConfigurations, "CODSTATUS: " + codstatus, enforce: true);
+                    WriteToLog(runtimeConfigurations, "TXTREASON: " + txtreason, enforce: true);
+                    WriteToLog(runtimeConfigurations, "ERRORCODE: " + errorcode, enforce: true);
+                    WriteToLog(runtimeConfigurations, "ERRORMESSAGE: " + errormessage, enforce: true);
+                    WriteToLog(runtimeConfigurations, "RETURNCODE: " + returncode, enforce: true);
+                }
+                else
+                {
+                    responseStr = responsePayload.Status;
+                    returnCode = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteToLog(runtimeConfigurations, ex.Message, enforce: true);
+                responseStr = ex.Message;
+            }
+
+            //return 1 if everuth went OK, else returns a number which is <= 0
+            return returnCode;
+        }
         public string MakeInquiryXMLCaseCompatible(string inputXML)
         {
             StringBuilder sb = new StringBuilder(inputXML);
@@ -605,7 +850,9 @@ namespace OnamaPaymentGateway
 
             sb = sb.Replace("INQLIST", "inqlist");
             sb = sb.Replace("PAYMENT>", "payment>");
+            sb = sb.Replace("REFERENCENO", "referenceno");
             sb = sb.Replace("PAYMENTREFNO", "paymentrefno");
+            sb = sb.Replace("DATPOST", "datpost");
             sb = sb.Replace("DATTXN", "dattxn");
 
             return sb.ToString();
@@ -757,6 +1004,52 @@ namespace OnamaPaymentGateway
             sb = sb.Replace("EMAILID", "emailid");
             sb = sb.Replace("REMITINFORMATION_1", "RemitInformation_1");
 
+            return sb.ToString();
+        }
+
+        public string MakeA2AXMLCaseCompatible(string inputXML)
+        {
+            StringBuilder sb = new StringBuilder(inputXML);
+
+            sb = sb.Replace("FAXML", "faxml");
+
+            sb = sb.Replace("HEADER", "header");
+            sb = sb.Replace("EXTSYSNAME", "extsysname");
+            sb = sb.Replace("DATPOST", "datpost");
+            sb = sb.Replace("BATCHNUMEXT", "batchnumext");
+            sb = sb.Replace("IDTXN", "idtxn");
+            sb = sb.Replace("CODCURR", "codcurr");
+            sb = sb.Replace("IDUSER", "iduser");
+            sb = sb.Replace("IDCUST", "idcust");
+            sb = sb.Replace("GROUPID", "groupid");
+            sb = sb.Replace("REQDATETIME", "reqdatetime");
+
+            sb = sb.Replace("SUMMARY", "summary");
+            sb = sb.Replace("ORGCOUNTDR", "orgcountdr");
+            sb = sb.Replace("ORGCOUNTCR", "orgcountcr");
+            sb = sb.Replace("ORGSUMDR", "orgsumdr");
+            sb = sb.Replace("ORGSUMCR", "orgsumcr");
+            
+            sb = sb.Replace("DEBIT", "debit");
+            sb = sb.Replace("STANEXT", "stanext");
+            sb = sb.Replace("ACCOUNTNO", "accountno");
+            sb = sb.Replace("ORGAMOUNT", "orgamount");
+            sb = sb.Replace("TXNDESC", "txndesc");
+            sb = sb.Replace("REFERENCENO", "referenceno");
+
+            sb = sb.Replace("CREDITLIST", "creditlist");
+            sb = sb.Replace("<CREDIT>", "<credit>");
+            sb = sb.Replace("</CREDIT>", "</credit>");
+            sb = sb.Replace("<AMOUNT>", "<amount>");
+            sb = sb.Replace("</AMOUNT>", "</amount>");
+            sb = sb.Replace("TXNDESC", "txndesc");
+            sb = sb.Replace("BENEID", "beneid");
+            sb = sb.Replace("BENENAME", "BeneName");
+            sb = sb.Replace("BENEADDRESS_1", "BeneAddress_1");
+            sb = sb.Replace("BENEADDRESS_2", "BeneAddress_2");
+            sb = sb.Replace("BENEADDRESS_3", "BeneAddress_3");
+            sb = sb.Replace("BENEADDRESS_4", "BeneAddress_4");
+            sb = sb.Replace("EMAILID", "emailid");
             return sb.ToString();
         }
         public string ConvertToLower(XmlReader xmlReader)
@@ -1166,6 +1459,144 @@ namespace OnamaPaymentGateway
                 catch (Exception ex)
                 {
                     WriteToLog(cfg, "Error while getting paymentrefno: " + ex.Message, enforce: true);
+                }
+
+                nodeList = doc.DocumentElement.GetElementsByTagName("rc");
+                if (nodeList.Count > 0)
+                {
+                    if (nodeList[0].Attributes.Count > 0)
+                    {
+                        try
+                        {
+                            errorcode = nodeList[0].Attributes["errorcode"].Value;
+                        }
+                        catch (Exception ex)
+                        {
+                            WriteToLog(cfg, "Error while getting errorcode: " + ex.Message, enforce: true);
+                        }
+                        try
+                        {
+                            errormessage = nodeList[0].Attributes["errormessage"].Value;
+                        }
+                        catch (Exception ex)
+                        {
+                            WriteToLog(cfg, "Error while getting errormessage: " + ex.Message, enforce: true);
+                        }
+                        try
+                        {
+                            returncode = nodeList[0].Attributes["returncode"].Value;
+                        }
+                        catch (Exception ex)
+                        {
+                            WriteToLog(cfg, "Error while getting returncode: " + ex.Message, enforce: true);
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            nodeList = doc.DocumentElement.GetElementsByTagName("errorcode");
+                            if (nodeList.Count > 0)
+                            {
+                                errorcode = nodeList[0].InnerText;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            WriteToLog(cfg, "Error while getting errorcode: " + ex.Message, enforce: true);
+                        }
+
+                        try
+                        {
+                            nodeList = doc.DocumentElement.GetElementsByTagName("errormessage");
+                            if (nodeList.Count > 0)
+                            {
+                                errormessage = nodeList[0].InnerText;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            WriteToLog(cfg, "Error while getting errormessage: " + ex.Message, enforce: true);
+                        }
+
+                        try
+                        {
+                            nodeList = doc.DocumentElement.GetElementsByTagName("returnCode");
+                            if (nodeList.Count > 0)
+                            {
+                                returncode = nodeList[0].InnerText;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            WriteToLog(cfg, "Error while getting returnCode: " + ex.Message, enforce: true);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteToLog(cfg, ex.Message, enforce: true);
+            }
+        }
+
+        public void GetResultsFromA2AInquiryResponse(RuntimeConfigurations cfg, String responseStr,
+                            out String codstatus, out String txtreason, out String errorcode, out String errormessage, out String returncode)
+        {
+            XmlDocument doc = new XmlDocument();
+            codstatus = String.Empty;
+            txtreason = String.Empty;
+            errorcode = String.Empty;
+            errormessage = String.Empty;
+            returncode = String.Empty;
+            try
+            {
+                doc.LoadXml(responseStr);
+                //int from = responseStr.IndexOf("<codstatus");
+                //int len1 = "<codstatus>".Length;
+                //int start = from + len1;
+
+                //int to = responseStr.IndexOf("</codstatus");
+                //codstatus = responseStr.Substring(start, to);
+                XmlNodeList nodeList = null;
+                XmlNode childNode = null;
+
+                try
+                {
+                    // / faml / inqlist / payment / codstatus
+                    // / faml / header / codstatus
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("utr");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    utr = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/inqlist/payment/codstatus");
+                    if (childNode != null)
+                    {
+                        codstatus = childNode.InnerText;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteToLog(cfg, "Error while getting codstatus: " + ex.Message, enforce: true);
+                }
+
+                try
+                {
+                    //nodeList = doc.DocumentElement.GetElementsByTagName("txtreason");
+                    //if (nodeList.Count > 0)
+                    //{
+                    //    txtreason = nodeList[0].InnerText;
+                    //}
+                    childNode = doc.SelectSingleNode("/faml/inqlist/payment/txtreason");
+                    if (childNode != null)
+                    {
+                        txtreason = childNode.InnerText;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteToLog(cfg, "Error while getting txtreason: " + ex.Message, enforce: true);
                 }
 
                 nodeList = doc.DocumentElement.GetElementsByTagName("rc");
