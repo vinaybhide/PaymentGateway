@@ -1,0 +1,25 @@
+﻿<faml>
+	<header>
+		<extsysname>COAPI</extsysname>
+		<datpost>2022-09-05</datpost>
+		<batchnumext>000126</batchnumext>
+		<idtxn>CO_RTI</idtxn>
+		<iduser>APIUSER@CBXMGRT1</iduser>
+		<idcust>50156014</idcust>
+		<groupid>CBXMGRT1</groupid>
+		<inqcount>1</inqcount>
+		<reqdatetime>2022-09-05T09:15:35</reqdatetime>
+		<codstatus>0</codstatus>
+		<txtstatus>SUCCESS</txtstatus>
+		<resdatetime>2022-09-05T11:46:31</resdatetime>
+	</header>
+	<inqlist>
+		<payment>
+			<paymentrefno>1234567891234576</paymentrefno>
+			<dattxn>2022-09-05</dattxn>
+			<codstatus>COM</codstatus>
+			<txtreason>Executed</txtreason>
+			<utr>HDFCR52022083053715365</utr>
+		</payment>
+	</inqlist>
+</faml>

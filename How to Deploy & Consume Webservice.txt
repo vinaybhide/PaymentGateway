@@ -1,0 +1,25 @@
+1. This requires Windows 10 machine 
+2. If you have not already activate IIS, then o to Add Windows Features and activate IIS
+3. Create a folder - PaymentGateway
+4. Copy "Bin" folder in the PaymentGateway folder
+5. Copy following files in the PaymentGateway folder
+	hdfcapi.asmx
+	configurations.xml
+	Web.config
+
+	vinay.key
+	vinay.pem
+	vinay.pfx
+	api-uat_bank_com_Leaf.txt
+
+6. Open IIS manager by typing "inetmgr" in windows search or go to Control Panel->Administrative Tools->IIS manager
+7. Select "Default Web Site"
+8. RIght click and select "Virtual Folder"
+9. Give name as "PaymentGateway" and select the folder you created above as Physical Folder
+10. Click OK
+11. In Features options, select default page feature and add "hdfcapi.asmx"
+12. Select "PaymentGateway" under "Default" and right click & select Convert to Webapplication to create a Web application
+13. After this right click and browse to web application
+14 A web page will open, in which you should see the Web Methods.
+
+	
